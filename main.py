@@ -211,3 +211,74 @@ def _keccak_256(data: bytes) -> bytes:
     """
     try:
         # pycryptodome style
+        from Crypto.Hash import keccak  # type: ignore
+
+        k = keccak.new(digest_bits=256)
+        k.update(data)
+        return k.digest()
+    except Exception:
+        try:
+            import sha3  # type: ignore
+
+            k = sha3.keccak_256()
+            k.update(data)
+            return k.digest()
+        except Exception:
+            # Fallback (NOT keccak): NIST SHA3-256
+            return hashlib.sha3_256(data).digest()
+
+
+def keccak_hex(data: bytes) -> str:
+    return "0x" + _keccak_256(data).hex()
+
+
+def solidity_packed(*items: tuple[str, t.Any]) -> bytes:
+    """
+    Minimal subset of abi.encodePacked for the exact tuples we use here.
+    Supported types: address, bytes32, uint256, uint64
+    """
+    out = bytearray()
+    for typ, val in items:
+        if typ == "address":
+            if isinstance(val, str):
+                v = val.lower()
+                if v.startswith("0x"):
+                    v = v[2:]
+                b = bytes.fromhex(v.rjust(40, "0"))
+            elif isinstance(val, bytes):
+                b = val.rjust(20, b"\x00")
+            else:
+                raise TypeError("address must be hex string or bytes")
+            if len(b) != 20:
+                raise ValueError("address must be 20 bytes")
+            out.extend(b)
+        elif typ == "bytes32":
+            if isinstance(val, str):
+                v = val[2:] if val.startswith("0x") else val
+                b = bytes.fromhex(v.rjust(64, "0"))
+            elif isinstance(val, bytes):
+                b = val.rjust(32, b"\x00")
+            else:
+                raise TypeError("bytes32 must be hex string or bytes")
+            if len(b) != 32:
+                raise ValueError("bytes32 must be 32 bytes")
+            out.extend(b)
+        elif typ == "uint256":
+            if not isinstance(val, int):
+                raise TypeError("uint256 must be int")
+            out.extend(int(val).to_bytes(32, "big"))
+        elif typ == "uint64":
+            if not isinstance(val, int):
+                raise TypeError("uint64 must be int")
+            out.extend(int(val).to_bytes(8, "big"))
+        else:
+            raise ValueError(f"unsupported type {typ}")
+    return bytes(out)
+
+
+# -----------------------------
+# Prompt building blocks
+# -----------------------------
+
+
+@dataclass(frozen=True)
