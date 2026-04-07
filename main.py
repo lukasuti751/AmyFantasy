@@ -140,3 +140,74 @@ class Safety:
 
     @classmethod
     def safe_flags_for_contract(cls, text: str) -> int:
+        """
+        The contract supports flags bits 9 (minors) and 10 (explicit sexual).
+        We always return 0 for safe prompts, or raise SafetyError.
+        """
+        cls.check_text(text)
+        return 0
+
+
+# -----------------------------
+# Deterministic random / entropy
+# -----------------------------
+
+
+def _seed_from_bytes(b: bytes) -> int:
+    return int.from_bytes(hashlib.sha256(b).digest(), "big")
+
+
+class Rng:
+    """
+    A deterministic RNG for reproducible prompt variants.
+    Uses Python's Mersenne Twister seeded from SHA-256 for stable behavior across runs.
+    """
+
+    def __init__(self, seed: bytes) -> None:
+        self._r = random.Random(_seed_from_bytes(seed))
+
+    def choice(self, seq: t.Sequence[t.Any]) -> t.Any:
+        return seq[self._r.randrange(0, len(seq))]
+
+    def randrange(self, a: int, b: int | None = None) -> int:
+        if b is None:
+            return self._r.randrange(0, a)
+        return self._r.randrange(a, b)
+
+    def shuffle(self, xs: list[t.Any]) -> None:
+        self._r.shuffle(xs)
+
+    def randbytes(self, n: int) -> bytes:
+        # Deterministic, not cryptographic.
+        out = bytearray()
+        while len(out) < n:
+            out.extend(self._r.getrandbits(32).to_bytes(4, "big"))
+        return bytes(out[:n])
+
+    def uniform(self, a: float, b: float) -> float:
+        return self._r.uniform(a, b)
+
+
+def random_hex32() -> str:
+    return "0x" + secrets.token_hex(32)
+
+
+def random_hex20() -> str:
+    return "0x" + secrets.token_hex(20)
+
+
+def random_b32() -> bytes:
+    return secrets.token_bytes(32)
+
+
+def b32_to_hex(b: bytes) -> str:
+    return "0x" + b.hex()
+
+
+def _keccak_256(data: bytes) -> bytes:
+    """
+    Prefer real keccak when available; fallback is sha3_256 (not the same as keccak).
+    We include both paths and clearly label the fallback to avoid silent mistakes.
+    """
+    try:
+        # pycryptodome style
