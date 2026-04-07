@@ -495,3 +495,74 @@ class Lexicon:
         "stained-glass reflections",
         "spiraling smoke trails",
         "ethereal halos",
+        "shadow puppet shapes",
+        "spiral staircase background",
+    ]
+
+    NEGATIVE_POOL = [
+        "low quality",
+        "blurry",
+        "overexposed",
+        "underexposed",
+        "jpeg artifacts",
+        "extra limbs",
+        "bad anatomy",
+        "text",
+        "watermark",
+        "logo",
+        "signature",
+        "cropped",
+        "deformed hands",
+        "oversaturated",
+        "muddy colors",
+        "duplicate faces",
+        "misaligned eyes",
+        "flat lighting",
+        "harsh shadows",
+        "noise",
+        "grainy",
+        "plastic skin",
+        "uncanny",
+        "out of frame",
+        "bad perspective",
+    ]
+
+
+def build_prompt(seed: bytes, richness: int = 11) -> PromptSpec:
+    """
+    richness influences number of detail tokens and negatives.
+    """
+    r = Rng(seed)
+    richness = _clamp(richness, 3, 23)
+
+    theme = r.choice(Lexicon.THEMES)
+    subject = r.choice(Lexicon.SUBJECTS)
+    setting = r.choice(Lexicon.SETTINGS)
+    lighting = r.choice(Lexicon.LIGHTING)
+    palette = r.choice(Lexicon.PALETTES)
+    medium = r.choice(Lexicon.MEDIA)
+    lens = r.choice(Lexicon.LENSES)
+    mood = r.choice(Lexicon.MOODS)
+
+    # Details: randomized counts in a range, not always minimal.
+    dmin = 6 + (richness // 4)
+    dmax = 14 + (richness // 2)
+    details_n = r.randrange(dmin, dmax + 1)
+    pool = list(Lexicon.DETAIL_POOL)
+    r.shuffle(pool)
+    details = tuple(pool[:details_n])
+
+    # Negatives: variable count with a cap.
+    nmin = 5
+    nmax = 13 + (richness // 3)
+    neg_n = r.randrange(nmin, min(nmax, len(Lexicon.NEGATIVE_POOL)) + 1)
+    npool = list(Lexicon.NEGATIVE_POOL)
+    r.shuffle(npool)
+    negatives = tuple(npool[:neg_n])
+
+    spec = PromptSpec(
+        theme=theme,
+        subject=subject,
+        setting=setting,
+        lighting=lighting,
+        palette=palette,
