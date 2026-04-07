@@ -282,3 +282,74 @@ def solidity_packed(*items: tuple[str, t.Any]) -> bytes:
 
 
 @dataclass(frozen=True)
+class PromptSpec:
+    theme: str
+    subject: str
+    setting: str
+    lighting: str
+    palette: str
+    medium: str
+    lens: str
+    mood: str
+    details: tuple[str, ...]
+    negatives: tuple[str, ...]
+
+    def render(self) -> str:
+        parts: list[str] = []
+        parts.append(f"{self.theme}")
+        parts.append(f"Subject: {self.subject}")
+        parts.append(f"Setting: {self.setting}")
+        parts.append(f"Lighting: {self.lighting}")
+        parts.append(f"Palette: {self.palette}")
+        parts.append(f"Medium: {self.medium}")
+        parts.append(f"Lens/Framing: {self.lens}")
+        parts.append(f"Mood: {self.mood}")
+        if self.details:
+            parts.append("Details: " + ", ".join(self.details))
+        if self.negatives:
+            parts.append("Negative: " + ", ".join(self.negatives))
+        return " | ".join(parts)
+
+
+class Lexicon:
+    THEMES = [
+        "High fantasy illustration",
+        "Arcane cathedral realism",
+        "Mythic ink + watercolor",
+        "Crystalline dreamscape",
+        "Eldritch botanical fantasy",
+        "Celestial clockwork fable",
+        "Rune-etched storybook art",
+        "Ancient tapestry scene",
+        "Neo-baroque fantasy portrait",
+        "Luminous cave-myth vignette",
+        "Stormbound hero chronicle",
+        "Glacier-sigil folklore",
+        "Sunken-library myth",
+        "Astral sea voyage",
+        "Moonlit ruins tableau",
+    ]
+
+    SUBJECTS = [
+        "a masked archivist weaving starlight threads into a map",
+        "a gentle dragon curled around an observatory, reading constellations",
+        "a wandering knight carrying a lantern filled with fireflies",
+        "a sorcerer carving runes into falling snow",
+        "an oracle holding a glass prism that refracts memories",
+        "a clockmaker witch balancing gears and petals",
+        "a river spirit made of mist and reeds",
+        "a fox familiar delivering a sealed prophecy",
+        "a bard with a stringed instrument of meteor iron",
+        "a librarian golem sorting floating books by scent",
+        "a guardian statue awakening at dusk",
+        "an alchemist painting potions into existence",
+        "a sky-sailor steering through auroras",
+        "a phoenix perched on a frost-crowned throne",
+        "a merfolk cartographer sketching currents in bioluminescent ink",
+    ]
+
+    SETTINGS = [
+        "inside a forgotten observatory with rotating brass ceilings",
+        "in a mossy amphitheater where statues hum softly",
+        "on a cliffside city of lanterns and wind-chimes",
+        "within a sunken library whose shelves breathe bubbles",
