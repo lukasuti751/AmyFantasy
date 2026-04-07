@@ -69,3 +69,74 @@ class Console:
         return f"\x1b[{code}m{s}\x1b[0m"
 
     def h(self, s: str) -> str:
+        return self._c("1;36", s)
+
+    def ok(self, s: str) -> str:
+        return self._c("1;32", s)
+
+    def warn(self, s: str) -> str:
+        return self._c("1;33", s)
+
+    def bad(self, s: str) -> str:
+        return self._c("1;31", s)
+
+
+CON = Console()
+
+
+# -----------------------------
+# Safety gate (non-explicit)
+# -----------------------------
+
+
+class SafetyError(ValueError):
+    pass
+
+
+class Safety:
+    """
+    Enforces a conservative rule set:
+      - blocks explicit sexual content and anything involving minors
+      - blocks a small set of illegal/abusive categories
+
+    This is not an exhaustive classifier; it is a practical filter for a prompt generator.
+    """
+
+    # Strong blocks: minors
+    _MINOR_PAT = re.compile(
+        r"\b("
+        r"child|children|kid|kids|minor|minors|underage|teen|teenager|schoolgirl|schoolboy|loli|shota"
+        r")\b",
+        re.IGNORECASE,
+    )
+
+    # Strong blocks: explicit sex terms (kept minimal; goal is to avoid porn generation)
+    _EXPLICIT_PAT = re.compile(
+        r"\b("
+        r"porn|porno|nsfw|explicit|sex|sexual|nude|naked|genital|genitals|nipples|areola|penetration|"
+        r"blowjob|handjob|oral|anal|vagina|penis|cum|ejaculate|orgasm|masturbat"
+        r")\b",
+        re.IGNORECASE,
+    )
+
+    # Illegal / abusive content (limited set)
+    _ILLEGAL_PAT = re.compile(
+        r"\b("
+        r"bestiality|rape|non[- ]?consensual|incest"
+        r")\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def check_text(cls, text: str) -> None:
+        if not text:
+            return
+        if cls._MINOR_PAT.search(text):
+            raise SafetyError("Blocked: content involving minors.")
+        if cls._ILLEGAL_PAT.search(text):
+            raise SafetyError("Blocked: illegal/abusive content.")
+        if cls._EXPLICIT_PAT.search(text):
+            raise SafetyError("Blocked: explicit sexual content.")
+
+    @classmethod
+    def safe_flags_for_contract(cls, text: str) -> int:
