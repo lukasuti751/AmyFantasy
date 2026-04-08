@@ -992,3 +992,74 @@ def cmd_show(args: argparse.Namespace) -> int:
     if it.notes:
         print(f"- notes: {it.notes}")
     print()
+    print(_wrap(it.prompt))
+    return 0
+
+
+def cmd_search(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    res = lib.search(args.query)
+    if not res:
+        print(CON.warn("No matches."))
+        return 0
+    for it in res:
+        print(f"{it.id}  {it.created_at}  {it.prompt_hash}  tags={len(it.tags)}")
+    return 0
+
+
+def cmd_tag(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    lib.tag(args.id, args.tags)
+    print(CON.ok("Updated tags."))
+    return 0
+
+
+def cmd_attrib(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    lib.set_attribution(args.id, args.attribution)
+    print(CON.ok("Updated attribution."))
+    return 0
+
+
+def cmd_notes(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    lib.set_notes(args.id, args.notes)
+    print(CON.ok("Updated notes."))
+    return 0
+
+
+def cmd_commit(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    it = lib.get(args.id)
+    author = args.author
+    if author is None:
+        # Generate a random address if none provided (offline prep).
+        author = random_hex20()
+
+    bundle = commit_bundle(author=author, prompt_hash=it.prompt_hash)
+
+    print(CON.h("Commit bundle"))
+    print(f"- author: {bundle.author}")
+    print(f"- prompt_hash: {bundle.prompt_hash}")
+    print(f"- salt: {bundle.salt}")
+    print(f"- salt_hint: {bundle.salt_hint}")
+    print(f"- commit_hash: {bundle.commit_hash}")
+    return 0
+
+
+def cmd_preview(args: argparse.Namespace) -> int:
+    # Local preview (matches contract "decorative preview" vibe, not identical).
+    lib = Library(args.library)
+    it = lib.get(args.id)
+    seed = it.seed_bytes()
+    r = Rng(seed + b"preview" + args.salt.encode("utf-8"))
+    words = _clamp(int(args.words), 3, 33)
+    chunks: list[str] = []
+    for i in range(words):
+        # pseudo-word
+        b = r.randbytes(4)
+        n = int.from_bytes(b, "big")
+        chunks.append(f"0x{n:04x}-{(n * 97 + i) % 10000:04d}")
+    print(" ".join(chunks))
+    return 0
+
