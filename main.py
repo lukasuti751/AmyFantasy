@@ -566,3 +566,74 @@ def build_prompt(seed: bytes, richness: int = 11) -> PromptSpec:
         setting=setting,
         lighting=lighting,
         palette=palette,
+        medium=medium,
+        lens=lens,
+        mood=mood,
+        details=details,
+        negatives=negatives,
+    )
+
+    Safety.check_text(spec.render())
+    return spec
+
+
+# -----------------------------
+# Local library storage
+# -----------------------------
+
+
+@dataclass
+class LibraryItem:
+    id: str
+    created_at: str
+    seed_b64: str
+    richness: int
+    prompt: str
+    prompt_hash: str
+    tags: list[str] = field(default_factory=list)
+    attribution: str = ""
+    notes: str = ""
+
+    def seed_bytes(self) -> bytes:
+        return base64.b64decode(self.seed_b64.encode("ascii"))
+
+
+class Library:
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self.items: dict[str, LibraryItem] = {}
+        self._load()
+
+    def _load(self) -> None:
+        if not os.path.exists(self.path):
+            self.items = {}
+            return
+        with open(self.path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        items: dict[str, LibraryItem] = {}
+        for it in raw.get("items", []):
+            li = LibraryItem(**it)
+            items[li.id] = li
+        self.items = items
+
+    def save(self) -> None:
+        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+        payload = {
+            "version": 1,
+            "saved_at": _now_iso(),
+            "items": [dataclasses.asdict(v) for v in self.items.values()],
+        }
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, sort_keys=False)
+        os.replace(tmp, self.path)
+
+    def add(self, item: LibraryItem) -> None:
+        if item.id in self.items:
+            raise ValueError("id already exists")
+        self.items[item.id] = item
+        self.save()
+
+    def get(self, item_id: str) -> LibraryItem:
+        if item_id not in self.items:
+            raise KeyError(item_id)
