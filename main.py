@@ -921,3 +921,74 @@ class Chain:
         c = self._build_contract(contract_addr, self.alixepaxxx_abi_min())
         return getattr(c.functions, fn)(*args).call()
 
+
+# -----------------------------
+# Command implementations
+# -----------------------------
+
+
+def cmd_generate(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    richness = int(args.richness)
+
+    seed = secrets.token_bytes(32) if args.seed is None else base64.b64decode(args.seed.encode("ascii"))
+    if len(seed) < 16:
+        seed = seed.ljust(16, b"\x00")
+
+    spec = build_prompt(seed=seed, richness=richness)
+    prompt = spec.render()
+
+    Safety.check_text(prompt)
+    ph = hash_prompt_text(prompt)
+    item_id = make_item_id(seed)
+
+    it = LibraryItem(
+        id=item_id,
+        created_at=_now_iso(),
+        seed_b64=base64.b64encode(seed).decode("ascii"),
+        richness=richness,
+        prompt=prompt,
+        prompt_hash=ph,
+        tags=[normalize_tag(t0) for t0 in (args.tags or []) if normalize_tag(t0)],
+        attribution=args.attribution or "",
+        notes=args.notes or "",
+    )
+    lib.add(it)
+
+    print(CON.ok("Saved"))
+    print(f"- id: {it.id}")
+    print(f"- prompt_hash (bytes32): {it.prompt_hash}")
+    print(f"- richness: {it.richness}")
+    if it.tags:
+        print(f"- tags: {', '.join(it.tags)}")
+    if it.attribution:
+        print(f"- attribution: {it.attribution}")
+    print()
+    print(_wrap(it.prompt))
+    return 0
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    ids = lib.list_ids()
+    if not ids:
+        print(CON.warn("Library empty. Use `generate` first."))
+        return 0
+    for i in ids:
+        it = lib.get(i)
+        print(f"{it.id}  {it.created_at}  {it.prompt_hash}")
+    return 0
+
+
+def cmd_show(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    it = lib.get(args.id)
+    print(CON.h(f"AmyFantasy item {it.id}"))
+    print(f"- created_at: {it.created_at}")
+    print(f"- prompt_hash: {it.prompt_hash}")
+    print(f"- richness: {it.richness}")
+    print(f"- tags: {', '.join(it.tags) if it.tags else '(none)'}")
+    print(f"- attribution: {it.attribution if it.attribution else '(none)'}")
+    if it.notes:
+        print(f"- notes: {it.notes}")
+    print()
