@@ -779,3 +779,74 @@ class Chain:
         self.web3 = w3
 
         if self.private_key:
+            acct = w3.eth.account.from_key(self.private_key)
+            self.account = acct
+
+    def checksum(self, addr: str) -> str:
+        assert self.web3 is not None
+        return self.web3.to_checksum_address(addr)
+
+    def chain_id(self) -> int:
+        assert self.web3 is not None
+        return int(self.web3.eth.chain_id)
+
+    def address(self) -> str:
+        if not self.account:
+            raise ChainError("No private key loaded.")
+        return str(self.account.address)
+
+    def _build_contract(self, address: str, abi: list[dict[str, t.Any]]):
+        assert self.web3 is not None
+        return self.web3.eth.contract(address=self.checksum(address), abi=abi)
+
+    @staticmethod
+    def alixepaxxx_abi_min() -> list[dict[str, t.Any]]:
+        # Minimal ABI for commit/reveal/forge/tag/preview/storySeed and basic reads.
+        return [
+            {
+                "type": "function",
+                "name": "commit",
+                "stateMutability": "nonpayable",
+                "inputs": [
+                    {"name": "commitHash", "type": "bytes32"},
+                    {"name": "saltHint", "type": "bytes32"},
+                    {"name": "minDelayBlocks", "type": "uint256"},
+                    {"name": "maxDelayBlocks", "type": "uint256"},
+                ],
+                "outputs": [],
+            },
+            {
+                "type": "function",
+                "name": "reveal",
+                "stateMutability": "nonpayable",
+                "inputs": [
+                    {"name": "commitHash", "type": "bytes32"},
+                    {"name": "promptHash", "type": "bytes32"},
+                    {"name": "salt", "type": "bytes32"},
+                ],
+                "outputs": [{"name": "entropy", "type": "bytes32"}],
+            },
+            {
+                "type": "function",
+                "name": "forge",
+                "stateMutability": "payable",
+                "inputs": [
+                    {"name": "promptHash", "type": "bytes32"},
+                    {"name": "flags", "type": "uint64"},
+                    {"name": "revealEntropy", "type": "bytes32"},
+                ],
+                "outputs": [{"name": "id", "type": "uint256"}],
+            },
+            {
+                "type": "function",
+                "name": "tag",
+                "stateMutability": "payable",
+                "inputs": [
+                    {"name": "id", "type": "uint256"},
+                    {"name": "tagHash", "type": "bytes32"},
+                ],
+                "outputs": [],
+            },
+            {
+                "type": "function",
+                "name": "baseFeeWei",
