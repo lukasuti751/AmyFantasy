@@ -1205,3 +1205,74 @@ def cmd_chain_reveal(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
+        prog="AmyFantasy",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent(
+            """
+            AmyFantasy — fantasy prompt studio (safe / non-explicit)
+
+            Quickstart:
+              python AmyFantasy.py generate
+              python AmyFantasy.py list
+              python AmyFantasy.py show <id>
+              python AmyFantasy.py commit <id> --author 0xYourAddress
+
+            Optional chain ops (requires: pip install web3 and a working RPC):
+              python AmyFantasy.py chain-info --rpc https://...
+              python AmyFantasy.py chain-commit <id> --rpc ... --contract 0x... --prompt-key
+              python AmyFantasy.py chain-reveal <id> --rpc ... --contract 0x... --commit-hash 0x... --salt 0x... --prompt-key
+              python AmyFantasy.py chain-forge <id> --rpc ... --contract 0x... --prompt-key
+            """
+        ).strip(),
+    )
+    p.add_argument("--library", default=default_library_path(), help="Path to library JSON.")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    g = sub.add_parser("generate", help="Generate and save a new safe fantasy prompt.")
+    g.add_argument("--richness", default=11, type=int, help="3..23; higher => more details.")
+    g.add_argument("--seed", default=None, help="Base64 seed for reproducible output.")
+    g.add_argument("--tags", nargs="*", default=[], help="Optional tags.")
+    g.add_argument("--attribution", default="", help="Optional attribution string (offchain).")
+    g.add_argument("--notes", default="", help="Optional notes (offchain).")
+    g.set_defaults(fn=cmd_generate)
+
+    ls = sub.add_parser("list", help="List library items.")
+    ls.set_defaults(fn=cmd_list)
+
+    sh = sub.add_parser("show", help="Show a library item.")
+    sh.add_argument("id", help="Item id.")
+    sh.set_defaults(fn=cmd_show)
+
+    se = sub.add_parser("search", help="Search prompts/tags/notes.")
+    se.add_argument("query", help="Search query.")
+    se.set_defaults(fn=cmd_search)
+
+    tg = sub.add_parser("tag", help="Add tags to an item.")
+    tg.add_argument("id", help="Item id.")
+    tg.add_argument("tags", nargs="+", help="Tags to add.")
+    tg.set_defaults(fn=cmd_tag)
+
+    at = sub.add_parser("attrib", help="Set attribution for an item.")
+    at.add_argument("id", help="Item id.")
+    at.add_argument("attribution", help="Attribution text.")
+    at.set_defaults(fn=cmd_attrib)
+
+    nt = sub.add_parser("notes", help="Set notes for an item.")
+    nt.add_argument("id", help="Item id.")
+    nt.add_argument("notes", help="Notes text.")
+    nt.set_defaults(fn=cmd_notes)
+
+    cm = sub.add_parser("commit", help="Create a commit/reveal bundle (offline).")
+    cm.add_argument("id", help="Item id.")
+    cm.add_argument("--author", default=None, help="0x address. If omitted, generates a random address.")
+    cm.set_defaults(fn=cmd_commit)
+
+    pv = sub.add_parser("preview", help="Local decorative preview (offline).")
+    pv.add_argument("id", help="Item id.")
+    pv.add_argument("--words", default=17, type=int, help="3..33 words.")
+    pv.add_argument("--salt", default="glass-rose", help="Extra salt for local preview.")
+    pv.set_defaults(fn=cmd_preview)
+
+    ci = sub.add_parser("chain-info", help="Show chain id and (optional) wallet address.")
+    ci.add_argument("--rpc", required=True, help="RPC URL.")
+    ci.add_argument("--private-key", default=None, help="0x private key (avoid sharing; use env instead).")
