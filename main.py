@@ -850,3 +850,74 @@ class Chain:
             {
                 "type": "function",
                 "name": "baseFeeWei",
+                "stateMutability": "view",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "uint256"}],
+            },
+            {
+                "type": "function",
+                "name": "tagFeeWei",
+                "stateMutability": "view",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "uint256"}],
+            },
+            {
+                "type": "function",
+                "name": "preview",
+                "stateMutability": "pure",
+                "inputs": [
+                    {"name": "promptHash", "type": "bytes32"},
+                    {"name": "entropy", "type": "bytes32"},
+                    {"name": "words", "type": "uint256"},
+                ],
+                "outputs": [{"name": "", "type": "string"}],
+            },
+            {
+                "type": "function",
+                "name": "storySeed",
+                "stateMutability": "view",
+                "inputs": [
+                    {"name": "id", "type": "uint256"},
+                    {"name": "userSalt", "type": "bytes32"},
+                ],
+                "outputs": [{"name": "", "type": "bytes32"}],
+            },
+        ]
+
+    def send_tx(self, tx) -> str:
+        assert self.web3 is not None
+        if not self.account:
+            raise ChainError("No private key loaded.")
+        signed = self.account.sign_transaction(tx)
+        h = self.web3.eth.send_raw_transaction(signed.rawTransaction)
+        return h.hex()
+
+    def build_and_send(self, contract_addr: str, fn: str, args: list[t.Any], value_wei: int = 0) -> str:
+        assert self.web3 is not None
+        if not self.account:
+            raise ChainError("No private key loaded.")
+
+        c = self._build_contract(contract_addr, self.alixepaxxx_abi_min())
+        nonce = self.web3.eth.get_transaction_count(self.account.address)
+        gas_price = self.web3.eth.gas_price
+        tx = getattr(c.functions, fn)(*args).build_transaction(
+            {
+                "from": self.account.address,
+                "nonce": nonce,
+                "value": int(value_wei),
+                "gasPrice": int(gas_price),
+            }
+        )
+
+        # Estimate gas with a safety buffer.
+        try:
+            est = self.web3.eth.estimate_gas(tx)
+            tx["gas"] = int(est * 12 // 10) + 25000
+        except Exception:
+            tx["gas"] = 450000
+        return self.send_tx(tx)
+
+    def call(self, contract_addr: str, fn: str, args: list[t.Any]) -> t.Any:
+        c = self._build_contract(contract_addr, self.alixepaxxx_abi_min())
+        return getattr(c.functions, fn)(*args).call()
+
