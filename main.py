@@ -1063,3 +1063,74 @@ def cmd_preview(args: argparse.Namespace) -> int:
     print(" ".join(chunks))
     return 0
 
+
+def _read_private_key_from_env_or_prompt(args: argparse.Namespace) -> str | None:
+    if args.private_key:
+        return args.private_key.strip()
+    env = os.environ.get("AMYFANTASY_PRIVATE_KEY")
+    if env:
+        return env.strip()
+    legacy = os.environ.get("ANNAFANTASY_PRIVATE_KEY")
+    if legacy:
+        return legacy.strip()
+    if args.prompt_key:
+        return getpass.getpass("Private key (0x...): ").strip()
+    return None
+
+
+def cmd_chain_info(args: argparse.Namespace) -> int:
+    pk = _read_private_key_from_env_or_prompt(args)
+    ch = Chain(args.rpc, private_key=pk)
+    print(CON.h("Chain info"))
+    print(f"- chain_id: {ch.chain_id()}")
+    if pk:
+        print(f"- address: {ch.address()}")
+    return 0
+
+
+def cmd_chain_forge(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    it = lib.get(args.id)
+    pk = _read_private_key_from_env_or_prompt(args)
+    if not pk:
+        raise ChainError("Need a private key (use --private-key or --prompt-key or env AMYFANTASY_PRIVATE_KEY).")
+
+    flags = Safety.safe_flags_for_contract(it.prompt)
+    # revealEntropy is optional; default 0x00..00
+    reveal_entropy = _require_hex(args.reveal_entropy, 32) if args.reveal_entropy else "0x" + "00" * 32
+
+    ch = Chain(args.rpc, private_key=pk)
+    # read fee from chain
+    fee = int(ch.call(args.contract, "baseFeeWei", []))
+
+    txh = ch.build_and_send(
+        contract_addr=args.contract,
+        fn="forge",
+        args=[it.prompt_hash, int(flags), reveal_entropy],
+        value_wei=fee,
+    )
+    print(CON.ok("Sent"))
+    print(f"- tx: 0x{txh}")
+    print(f"- fee_wei: {fee}")
+    return 0
+
+
+def cmd_chain_tag(args: argparse.Namespace) -> int:
+    pk = _read_private_key_from_env_or_prompt(args)
+    if not pk:
+        raise ChainError("Need a private key (use --private-key or --prompt-key or env AMYFANTASY_PRIVATE_KEY).")
+    tag = normalize_tag(args.tag)
+    if not tag:
+        raise ValueError("empty tag after normalization")
+    tag_hash = keccak_hex(tag.encode("utf-8"))
+
+    ch = Chain(args.rpc, private_key=pk)
+    fee = int(ch.call(args.contract, "tagFeeWei", []))
+    txh = ch.build_and_send(
+        contract_addr=args.contract,
+        fn="tag",
+        args=[int(args.prompt_id), tag_hash],
+        value_wei=fee,
+    )
+    print(CON.ok("Sent"))
+    print(f"- tx: 0x{txh}")
