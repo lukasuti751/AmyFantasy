@@ -708,3 +708,74 @@ class CommitBundle:
     author: str
     prompt_hash: str
     salt: str
+    salt_hint: str
+    commit_hash: str
+
+
+def _require_hex(s: str, nbytes: int | None = None) -> str:
+    s = s.strip()
+    if not s.startswith("0x"):
+        raise ValueError("expected 0x-prefixed hex string")
+    hx = s[2:]
+    if not re.fullmatch(r"[0-9a-fA-F]*", hx):
+        raise ValueError("invalid hex")
+    if nbytes is not None and len(hx) != nbytes * 2:
+        raise ValueError(f"expected {nbytes} bytes hex")
+    return "0x" + hx.lower()
+
+
+def commit_bundle(author: str, prompt_hash: str, salt: str | None = None, salt_hint: str | None = None) -> CommitBundle:
+    """
+    Matches contract: commit = keccak256(abi.encodePacked(author, promptHash, salt, saltHint))
+    """
+    author = _require_hex(author, 20)
+    prompt_hash = _require_hex(prompt_hash, 32)
+    if salt is None:
+        salt = b32_to_hex(random_b32())
+    if salt_hint is None:
+        salt_hint = b32_to_hex(random_b32())
+    salt = _require_hex(salt, 32)
+    salt_hint = _require_hex(salt_hint, 32)
+
+    data = solidity_packed(
+        ("address", author),
+        ("bytes32", prompt_hash),
+        ("bytes32", salt),
+        ("bytes32", salt_hint),
+    )
+    ch = keccak_hex(data)
+    return CommitBundle(author=author, prompt_hash=prompt_hash, salt=salt, salt_hint=salt_hint, commit_hash=ch)
+
+
+# -----------------------------
+# Optional chain interaction
+# -----------------------------
+
+
+class ChainError(RuntimeError):
+    pass
+
+
+class Chain:
+    def __init__(self, rpc_url: str, private_key: str | None = None) -> None:
+        self.rpc_url = rpc_url
+        self.private_key = private_key
+        self.web3 = None
+        self.account = None
+        self._init_web3()
+
+    def _init_web3(self) -> None:
+        try:
+            from web3 import Web3  # type: ignore
+        except Exception as e:
+            raise ChainError(
+                "web3.py not installed. Install with: pip install web3\n"
+                "You can still use AmyFantasy offline for prompt+hash+commit/reveal."
+            ) from e
+
+        w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+        if not w3.is_connected():
+            raise ChainError("RPC not reachable.")
+        self.web3 = w3
+
+        if self.private_key:
