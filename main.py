@@ -1134,3 +1134,74 @@ def cmd_chain_tag(args: argparse.Namespace) -> int:
     )
     print(CON.ok("Sent"))
     print(f"- tx: 0x{txh}")
+    print(f"- tag: {tag}")
+    print(f"- tag_hash: {tag_hash}")
+    print(f"- fee_wei: {fee}")
+    return 0
+
+
+def cmd_chain_commit(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    it = lib.get(args.id)
+    pk = _read_private_key_from_env_or_prompt(args)
+    if not pk:
+        raise ChainError("Need a private key (use --private-key or --prompt-key or env AMYFANTASY_PRIVATE_KEY).")
+    ch = Chain(args.rpc, private_key=pk)
+    author = ch.address()
+
+    bundle = commit_bundle(author=author, prompt_hash=it.prompt_hash)
+    min_delay = int(args.min_delay)
+    max_delay = int(args.max_delay)
+
+    txh = ch.build_and_send(
+        contract_addr=args.contract,
+        fn="commit",
+        args=[bundle.commit_hash, bundle.salt_hint, min_delay, max_delay],
+        value_wei=0,
+    )
+    print(CON.ok("Sent"))
+    print(f"- tx: 0x{txh}")
+    print(f"- commit_hash: {bundle.commit_hash}")
+    print(f"- salt: {bundle.salt}")
+    print(f"- salt_hint: {bundle.salt_hint}")
+    return 0
+
+
+def cmd_chain_reveal(args: argparse.Namespace) -> int:
+    lib = Library(args.library)
+    it = lib.get(args.id)
+    pk = _read_private_key_from_env_or_prompt(args)
+    if not pk:
+        raise ChainError("Need a private key (use --private-key or --prompt-key or env AMYFANTASY_PRIVATE_KEY).")
+    ch = Chain(args.rpc, private_key=pk)
+    author = ch.address()
+
+    # Use provided bundle values, else regenerate won't match; so we require inputs.
+    commit_hash = _require_hex(args.commit_hash, 32)
+    salt = _require_hex(args.salt, 32)
+
+    # Confirm locally (best effort) that the commit matches, if salt_hint is provided.
+    salt_hint = _require_hex(args.salt_hint, 32) if args.salt_hint else None
+    if salt_hint:
+        b = commit_bundle(author=author, prompt_hash=it.prompt_hash, salt=salt, salt_hint=salt_hint)
+        if b.commit_hash != commit_hash:
+            raise ValueError("Provided commit_hash does not match (author, prompt_hash, salt, salt_hint).")
+
+    txh = ch.build_and_send(
+        contract_addr=args.contract,
+        fn="reveal",
+        args=[commit_hash, it.prompt_hash, salt],
+        value_wei=0,
+    )
+    print(CON.ok("Sent"))
+    print(f"- tx: 0x{txh}")
+    return 0
+
+
+# -----------------------------
+# CLI wiring
+# -----------------------------
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
