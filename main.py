@@ -1276,3 +1276,73 @@ def build_parser() -> argparse.ArgumentParser:
     ci = sub.add_parser("chain-info", help="Show chain id and (optional) wallet address.")
     ci.add_argument("--rpc", required=True, help="RPC URL.")
     ci.add_argument("--private-key", default=None, help="0x private key (avoid sharing; use env instead).")
+    ci.add_argument("--prompt-key", action="store_true", help="Prompt for private key.")
+    ci.set_defaults(fn=cmd_chain_info)
+
+    cf = sub.add_parser("chain-forge", help="Forge prompt hash onchain (requires web3).")
+    cf.add_argument("id", help="Item id.")
+    cf.add_argument("--rpc", required=True, help="RPC URL.")
+    cf.add_argument("--contract", required=True, help="AliXepaXXX contract address.")
+    cf.add_argument("--private-key", default=None, help="0x private key (or env AMYFANTASY_PRIVATE_KEY).")
+    cf.add_argument("--prompt-key", action="store_true", help="Prompt for private key.")
+    cf.add_argument("--reveal-entropy", default=None, help="Optional bytes32 entropy (0x..).")
+    cf.set_defaults(fn=cmd_chain_forge)
+
+    ct = sub.add_parser("chain-tag", help="Tag a forged prompt onchain (requires web3).")
+    ct.add_argument("--rpc", required=True, help="RPC URL.")
+    ct.add_argument("--contract", required=True, help="AliXepaXXX contract address.")
+    ct.add_argument("--prompt-id", required=True, type=int, help="Onchain prompt id.")
+    ct.add_argument("--tag", required=True, help="Tag text (will be normalized & hashed).")
+    ct.add_argument("--private-key", default=None, help="0x private key (or env AMYFANTASY_PRIVATE_KEY).")
+    ct.add_argument("--prompt-key", action="store_true", help="Prompt for private key.")
+    ct.set_defaults(fn=cmd_chain_tag)
+
+    cc = sub.add_parser("chain-commit", help="Submit commit() onchain (requires web3).")
+    cc.add_argument("id", help="Item id.")
+    cc.add_argument("--rpc", required=True, help="RPC URL.")
+    cc.add_argument("--contract", required=True, help="AliXepaXXX contract address.")
+    cc.add_argument("--min-delay", default=9, type=int, help="Min reveal delay blocks.")
+    cc.add_argument("--max-delay", default=333, type=int, help="Max reveal delay blocks.")
+    cc.add_argument("--private-key", default=None, help="0x private key (or env AMYFANTASY_PRIVATE_KEY).")
+    cc.add_argument("--prompt-key", action="store_true", help="Prompt for private key.")
+    cc.set_defaults(fn=cmd_chain_commit)
+
+    cr = sub.add_parser("chain-reveal", help="Submit reveal() onchain (requires web3).")
+    cr.add_argument("id", help="Item id.")
+    cr.add_argument("--rpc", required=True, help="RPC URL.")
+    cr.add_argument("--contract", required=True, help="AliXepaXXX contract address.")
+    cr.add_argument("--commit-hash", required=True, help="bytes32 0x.. commit hash.")
+    cr.add_argument("--salt", required=True, help="bytes32 0x.. salt.")
+    cr.add_argument("--salt-hint", default=None, help="Optional bytes32 saltHint for local verification.")
+    cr.add_argument("--private-key", default=None, help="0x private key (or env AMYFANTASY_PRIVATE_KEY).")
+    cr.add_argument("--prompt-key", action="store_true", help="Prompt for private key.")
+    cr.set_defaults(fn=cmd_chain_reveal)
+
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    p = build_parser()
+    args = p.parse_args(argv)
+    try:
+        return int(args.fn(args))
+    except SafetyError as e:
+        _eprint(CON.bad("Safety block:"), str(e))
+        return 2
+    except ChainError as e:
+        _eprint(CON.bad("Chain error:"), str(e))
+        return 3
+    except FileNotFoundError as e:
+        _eprint(CON.bad("File error:"), str(e))
+        return 4
+    except KeyError as e:
+        _eprint(CON.bad("Not found:"), str(e))
+        return 5
+    except Exception as e:
+        _eprint(CON.bad("Error:"), repr(e))
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
