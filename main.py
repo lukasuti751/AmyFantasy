@@ -637,3 +637,74 @@ class Library:
     def get(self, item_id: str) -> LibraryItem:
         if item_id not in self.items:
             raise KeyError(item_id)
+        return self.items[item_id]
+
+    def list_ids(self) -> list[str]:
+        return sorted(self.items.keys())
+
+    def search(self, q: str) -> list[LibraryItem]:
+        ql = q.lower().strip()
+        out: list[LibraryItem] = []
+        for it in self.items.values():
+            hay = " ".join([it.prompt, it.attribution, it.notes, " ".join(it.tags)]).lower()
+            if ql in hay:
+                out.append(it)
+        out.sort(key=lambda x: x.created_at, reverse=True)
+        return out
+
+    def tag(self, item_id: str, tags: list[str]) -> None:
+        it = self.get(item_id)
+        seen = set(it.tags)
+        for t0 in tags:
+            t1 = normalize_tag(t0)
+            if not t1:
+                continue
+            if t1 not in seen:
+                it.tags.append(t1)
+                seen.add(t1)
+        self.save()
+
+    def set_attribution(self, item_id: str, attribution: str) -> None:
+        it = self.get(item_id)
+        it.attribution = attribution.strip()
+        self.save()
+
+    def set_notes(self, item_id: str, notes: str) -> None:
+        it = self.get(item_id)
+        it.notes = notes
+        self.save()
+
+
+def default_library_path() -> str:
+    base = os.path.expanduser("~")
+    return os.path.join(base, ".amyfantasy", "library.json")
+
+
+def normalize_tag(tag: str) -> str:
+    tag = tag.strip().lower()
+    tag = re.sub(r"\s+", "-", tag)
+    tag = re.sub(r"[^a-z0-9\-_\.]+", "", tag)
+    return tag[:48]
+
+
+def hash_prompt_text(prompt: str) -> str:
+    Safety.check_text(prompt)
+    return keccak_hex(prompt.encode("utf-8"))
+
+
+def make_item_id(seed: bytes) -> str:
+    # Short stable ID.
+    h = hashlib.blake2b(seed, digest_size=9).digest()
+    return base64.urlsafe_b64encode(h).decode("ascii").rstrip("=")
+
+
+# -----------------------------
+# Commit / reveal helpers for AliXepaXXX
+# -----------------------------
+
+
+@dataclass(frozen=True)
+class CommitBundle:
+    author: str
+    prompt_hash: str
+    salt: str
